@@ -11,7 +11,7 @@ import torch.optim as optim
 BUFFER_SIZE = int(1e5)  # replay buffer size
 BATCH_SIZE = 64         # minibatch size
 #GAMMA = 0.99            # discount factor
-GAMMA = 0.98            # discount factor
+GAMMA = 0.99            # discount factor
 #TAU = 1e-3              # for soft update of target parameters
 TAU = 1e-3              # for soft update of target parameters
 LR = 5e-4               # learning rate 
@@ -102,23 +102,21 @@ class Agent():
         #print("actions.shape: {}".format(actions.shape))  # torch.Size([64, 8])
         #print("actions[:10]: {}".format(actions[:10]))
         #print("rewards.shape: {}".format(rewards.shape))  # torch.Size([64, 8])
-        #print("rewards[:10]: {}".format(rewards[:10]))
+        #print("rewards[-10:]: {}".format(rewards[-10:]))
+        #print("dones.shape: {}".format(dones.shape))  # torch.Size([64, 8])
+        #print("dones[-10:]: {}".format(dones[-10:]))
 
         #run the next_states through the network that doesn't get trained (target model) to get max q values of next state
         target_q_values_next = self.qnetwork_target(next_states)
-        #print("target_q_values[:10]: {}".format(target_q_values_next[:10]))
-        target_q_values_next_max, next_max_actions = torch.max(target_q_values_next, 1)
-        #print("target_q_values_max[:10]: {}".format(target_q_values_next_max[:10]))
+        target_q_values_next_max, indices = torch.max(target_q_values_next, dim=1, keepdim=True)
+        target_q_values_next_max = target_q_values_next_max * (1 - dones)  #remove dones
 
         local_q_values = self.qnetwork_local(states)
-        #print("local_q_values[:10]: {}".format(local_q_values[:10]))
-        #local_q_values_max, current_max_actions = torch.max(local_q_values, 1)   ### wrong assumption.  actions performed are not the max returned from self.qnetwork_local(states)
         local_q_values_performed = local_q_values.gather(1, actions)
-        #print("local_q_values_max[:10]: {}".format(local_q_values_max[:10]))
+
+        loss = torch.mean((rewards + (gamma * target_q_values_next_max) - local_q_values_performed)**2)
 
         self.optimizer.zero_grad()
-        loss = torch.mean((rewards + (gamma * target_q_values_next_max) - local_q_values_performed)**2)
-        #print("loss: {}".format(loss))
         loss.backward()
         self.optimizer.step()
 
